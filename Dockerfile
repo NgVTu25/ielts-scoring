@@ -2,16 +2,19 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV TZ=Asia/Ho_Chi_Minh
 
-# Install system dependencies
-# ffmpeg is required for pydub
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip==24.0 && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# The command to run the application will be provided by docker-compose
+EXPOSE 8000
+
+# Railway sẽ tự inject biến PORT khi khởi chạy
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
