@@ -7,12 +7,19 @@ from .models import submission as models
 from .celery_app import process_submission
 from typing import Dict, Any
 
-# Create database tables
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Free AI IELTS Speaking Scoring System")
 
-# Chỉ cần định nghĩa thư mục uploads một lần
+if os.getenv("USE_NGROK", "false").lower() == "true":
+    try:
+        from .ngrok_setup import start_ngrok
+        public_url = start_ngrok(port=8000)
+        if public_url:
+            print(f"🌍 Public API URL: {public_url}")
+    except Exception as e:
+        print(f"⚠️ Failed to start Ngrok: {e}")
+
 UPLOADS_DIR = "uploads"
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
