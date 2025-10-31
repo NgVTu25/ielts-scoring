@@ -6,39 +6,57 @@ DEFAULT_SCORE_ON_FAILURE = 5.0
 
 
 def analyze_pronunciation(audio_path):
-
     try:
-        y, sr = librosa.load(audio_path)
-        # Nếu audio quá ngắn, trả về điểm mặc định
-        if len(y) < sr * 0.5:  # Yêu cầu audio dài ít nhất 0.5 giây
+        # Load audio (mono)
+        y, sr = librosa.load(audio_path, sr=None)
+        duration = len(y) / sr
+
+        # File
+        if duration < 0.5:
             print("Warning: Audio too short for pronunciation analysis.")
             return DEFAULT_SCORE_ON_FAILURE
 
-        pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
+        # Check volume
+        mean_amp = np.mean(np.abs(y))
+        if mean_amp < 0.005:
+            print("Warning: Audio volume too low. Returning default score.")
+            return DEFAULT_SCORE_ON_FAILURE
 
-        median_magnitude = np.median(magnitudes)
-        if median_magnitude > 0:
+        # -------------------------------
+        try:
+            f0, voiced_flag, voiced_probs = librosa.pyin(
+                y,
+                fmin=librosa.note_to_hz('C2'),
+                fmax=librosa.note_to_hz('C7')
+            )
+            valid_f0 = f0[~np.isnan(f0)]
+
+            if len(valid_f0) > 0:
+                pitch_std_dev = np.std(valid_f0)
+            else:
+                raise ValueError("No valid f0 detected with pyin")
+
+        except Exception as e:
+            print(f"Fallback to piptrack due to pyin error: {e}")
+
+            pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
+            median_magnitude = np.median(magnitudes)
             pitch_values = pitches[magnitudes > median_magnitude]
-        else:
-            pitch_values = []
+            positive_pitches = pitch_values[pitch_values > 0]
 
-        # Nếu sau khi lọc vẫn không có pitch nào hợp lệ
-        if len(pitch_values) == 0 or np.all(pitch_values <= 0):
-            print("Warning: Could not detect a reliable pitch track. Returning default score.")
-            return DEFAULT_SCORE_ON_FAILURE
+            if len(positive_pitches) == 0:
+                print("Warning: Could not detect reliable pitch track even with piptrack.")
+                return DEFAULT_SCORE_ON_FAILURE
 
-        # Chỉ lấy các pitch dương để tính toán
-        positive_pitches = pitch_values[pitch_values > 0]
+            pitch_std_dev = np.std(positive_pitches)
 
-        if len(positive_pitches) == 0:
-            return DEFAULT_SCORE_ON_FAILURE
-        pitch_std_dev = np.std(positive_pitches)
-        clarity_score = max(5.0, 9.0 - (pitch_std_dev / 15))  # Tăng mẫu số để điểm không bị trừ quá nhiều
 
+        clarity_score = 9.0 - (pitch_std_dev / 15)
+
+        clarity_score = min(max(clarity_score, 3.0), 9.0)
         return round(clarity_score, 1)
 
     except Exception as e:
-        # Nếu có bất kỳ lỗi nào khác xảy ra trong librosa
         print(f"ERROR in pronunciation analysis: {e}. Returning default score.")
         return DEFAULT_SCORE_ON_FAILURE
 
@@ -51,11 +69,11 @@ def analyze_fluency(audio_path):
             return DEFAULT_SCORE_ON_FAILURE
 
         # Ngưỡng im lặng tương đối: thấp hơn 16 dB so với mức trung bình của audio
-        silence_thresh = audio.dBFS - 16
+        silence_thresh = audio.dBFS - 14
 
         silences = silence.detect_silence(
             audio,
-            min_silence_len=1000,  # Khoảng lặng tối thiểu 0.5 giây
+            min_silence_len=700,  # Khoảng lặng tối thiểu 0.5 giây
             silence_thresh=silence_thresh
         )
 
