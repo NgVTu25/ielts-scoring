@@ -20,7 +20,9 @@ RUN pip install --upgrade pip==24.0 \
 # Copy project files
 COPY . .
 
-# Expose port (if using API)
+# Expose port 8000 for FastAPI
 EXPOSE 8000
 
-# Default command is left to docker-compose
+# Start the FastAPI app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
