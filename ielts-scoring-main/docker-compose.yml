@@ -1,0 +1,45 @@
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis_server
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  api:
+    build: .
+    container_name: ielts_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+      - ./ielts_scorer.db:/app/ielts_scorer.db
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
+    restart: always
+
+  worker:
+    build: .
+    container_name: celery_worker
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+      - ./ielts_scorer.db:/app/ielts_scorer.db
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
+    command: celery -A app.celery_app worker --loglevel=info --pool=solo
+    depends_on:
+      - redis
+    restart: always
+
+volumes:
+  redis_data:
