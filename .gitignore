@@ -1,0 +1,51 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+instance/
+.env
+.venv/
+venv/
+ENV/
+env/
+*.sqlite3
+*.db
+
+# ===== IDE & Editor =====
+.vscode/
+.idea/
+*.iml
+
+# ===== Logs & Temp =====
+*.log
+*.pot
+*.pyc
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# ===== OS =====
+ehthumbs.db
+Icon?
+desktop.ini
+
+# ===== Docker =====
+/data/*
+docker-compose.override.yml
+
+# ===== Others =====
+uploads/
+*.json
+*.csv
+*.zip
+*.tar
+*.gz

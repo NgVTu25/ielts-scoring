@@ -1,0 +1,17 @@
+google-generativeai
+fastapi
+uvicorn[standard]
+celery
+redis
+pydantic
+sqlalchemy
+python-dotenv
+openai-whisper
+torch
+scikit-learn
+joblib
+pandas
+librosa
+pydub
+shortuuid
+python-multipart
