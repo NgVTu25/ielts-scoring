@@ -36,4 +36,4 @@ COPY --from=builder /install /usr/local
 COPY . .
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD bash -c "uvicorn app.services.main:app --host 0.0.0.0 --port 8000 & celery -A app.services.celery_app worker --loglevel=info --pool=solo"
