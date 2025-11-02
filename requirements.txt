@@ -1,7 +1,9 @@
---find-links https://download.pytorch.org/whl/cpu
-torch==2.1.0
-torchaudio
-torchvision
+# --find-links https://download.pytorch.org/whl/cpu
+# torch==2.1.0
+# torchaudio
+# torchvision
+# --------------------------------------------------------
+
 
 google-generativeai
 fastapi
@@ -14,6 +16,7 @@ python-dotenv
 openai-whisper
 
 numpy<2.0
+
 scikit-learn
 joblib
 pandas

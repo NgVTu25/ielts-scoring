@@ -9,11 +9,12 @@ import os
 import re
 
 MIN_ENGLISH_RATIO = 0.5
+REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 
 celery_app = Celery(
     "worker",
-    broker="redis://localhost:6379/0",
-    backend="redis://localhost:6379/0"
+    broker=REDIS_URL,
+    backend=REDIS_URL
 )
 
 
