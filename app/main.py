@@ -6,6 +6,8 @@ from . import database, utils
 from .models import submission as models
 from .celery_app import process_submission
 from typing import Dict, Any
+from .services.firebase_storage import upload_audio_file, delete_audio_file
+import shutil # Thư viện hữu ích cho file
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -30,7 +32,7 @@ def read_root():
 
 
 @app.post("/api/v1/submit", status_code=201)
-def submit_speaking_test(
+async def submit_speaking_test(
         user_id: str = Form(...),
         topic_prompt: str = Form(...),
         audio: UploadFile = File(...),
@@ -38,32 +40,23 @@ def submit_speaking_test(
 ) -> Dict[str, str]:
     submission_id = utils.generate_short_id()
 
-    # --- PHẦN LOGIC LƯU FILE BỊ THIẾU ĐÃ ĐƯỢC THÊM LẠI ---
+    audio_bytes = await audio.read()
+    file_extension = os.path.splitext(audio.filename)[1] or ".wav" # Default .wav
+
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
     try:
-        file_extension = os.path.splitext(audio.filename)[1]
-        if not file_extension:
-            file_extension = ".mp3"
-    except:
-        file_extension = ".mp3"
+        public_url = upload_audio_file(submission_id, audio_bytes, file_extension)
+        print(f"File uploaded to Firebase: {public_url}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload file to storage: {e}")
 
-    safe_filename = f"{submission_id}{file_extension}"
-    file_location = os.path.join(UPLOADS_DIR, safe_filename)
-
-    # Ghi nội dung file audio vào đĩa
-    with open(file_location, "wb+") as file_object:
-        file_object.write(audio.file.read())
-
-    # Kiểm tra xem file có bị rỗng không
-    if os.path.getsize(file_location) == 0:
-        os.remove(file_location)
-        raise HTTPException(status_code=400, detail="Uploaded file is empty or corrupted.")
-    # --------------------------------------------------------
-
-    # Bây giờ biến `file_location` đã tồn tại và hợp lệ
+    # 3. LƯU URL VÀO DATABASE
     db_submission = models.Submission(
         id=submission_id,
         user_id=user_id,
-        audio_path=file_location,  # <-- Dòng này sẽ hoạt động
+        audio_path=public_url, # <-- Lưu URL Firebase vào cột này
         status=models.SubmissionStatus.PENDING,
         topic_prompt=topic_prompt
     )
@@ -71,7 +64,8 @@ def submit_speaking_test(
     db.commit()
     db.refresh(db_submission)
 
-    process_submission.delay(submission_id, file_location, topic_prompt)
+    # 4. GỬI TÁC VỤ CHO WORKER
+    process_submission.delay(submission_id, public_url, topic_prompt) # <-- Gửi URL cho worker
 
     return {"submission_id": submission_id, "status": "PENDING"}
 

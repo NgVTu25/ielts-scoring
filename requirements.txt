@@ -26,3 +26,4 @@ shortuuid
 python-multipart
 pyngrok
 psycopg2-binary
+firebase-admin
