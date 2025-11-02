@@ -20,7 +20,7 @@ if os.getenv("USE_NGROK", "false").lower() == "true":
     except Exception as e:
         print(f"⚠️ Failed to start Ngrok: {e}")
 
-UPLOADS_DIR = "uploads"
+UPLOADS_DIR = "/app/uploads"
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
