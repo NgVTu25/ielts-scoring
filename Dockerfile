@@ -1,4 +1,20 @@
-# File: ielts-scorer/Dockerfile
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+ENV TZ=Asia/Ho_Chi_Minh
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    build-essential \
+    python3-dev \
+    libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --upgrade pip==24.0 && \
+    pip install --no-cache-dir --prefix="/install" -r requirements.txt
+
+
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -6,11 +22,10 @@ ENV TZ=Asia/Ho_Chi_Minh
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --upgrade pip==24.0 && \
-    pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /install /usr/local
 
 COPY . .
 

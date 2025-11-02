@@ -1,3 +1,8 @@
+--find-links https://download.pytorch.org/whl/cpu
+torch==2.1.0
+torchaudio
+torchvision
+
 google-generativeai
 fastapi
 uvicorn[standard]
@@ -7,7 +12,7 @@ pydantic
 sqlalchemy
 python-dotenv
 openai-whisper
-torch
+
 scikit-learn
 joblib
 pandas
@@ -15,4 +20,4 @@ librosa
 pydub
 shortuuid
 python-multipart
-pyngroks
+pyngrok
