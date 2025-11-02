@@ -18,6 +18,7 @@ services:
       - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
       - USE_NGROK=${USE_NGROK}
+      - CELERY_BROKER_URL=redis://redis:6379/0
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - redis
