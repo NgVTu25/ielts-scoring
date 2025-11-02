@@ -13,6 +13,7 @@ sqlalchemy
 python-dotenv
 openai-whisper
 
+numpy<2.0
 scikit-learn
 joblib
 pandas
