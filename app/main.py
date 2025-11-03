@@ -6,8 +6,7 @@ from . import database, utils
 from .models import submission as models
 from .celery_app import process_submission
 from typing import Dict, Any
-from .services.firebase_storage import upload_audio_file, delete_audio_file
-import shutil # Thư viện hữu ích cho file
+from .services.b2_storage import upload_audio_file
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -16,14 +15,15 @@ app = FastAPI(title="Free AI IELTS Speaking Scoring System")
 if os.getenv("USE_NGROK", "false").lower() == "true":
     try:
         from .ngrok_setup import start_ngrok
+
         public_url = start_ngrok(port=8000)
         if public_url:
             print(f"🌍 Public API URL: {public_url}")
     except Exception as e:
         print(f"⚠️ Failed to start Ngrok: {e}")
 
-UPLOADS_DIR = "/app/uploads"
-os.makedirs(UPLOADS_DIR, exist_ok=True)
+# UPLOADS_DIR = "/app/uploads"
+# os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
 @app.get("/")
@@ -41,22 +41,20 @@ async def submit_speaking_test(
     submission_id = utils.generate_short_id()
 
     audio_bytes = await audio.read()
-    file_extension = os.path.splitext(audio.filename)[1] or ".wav" # Default .wav
 
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        public_url = upload_audio_file(submission_id, audio_bytes, file_extension)
-        print(f"File uploaded to Firebase: {public_url}")
+        public_url = upload_audio_file(submission_id, audio_bytes, audio.content_type)
+        print(f"File uploaded to B2: {public_url}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to storage: {e}")
 
-    # 3. LƯU URL VÀO DATABASE
     db_submission = models.Submission(
         id=submission_id,
         user_id=user_id,
-        audio_path=public_url, # <-- Lưu URL Firebase vào cột này
+        audio_path=public_url,
         status=models.SubmissionStatus.PENDING,
         topic_prompt=topic_prompt
     )
@@ -64,8 +62,7 @@ async def submit_speaking_test(
     db.commit()
     db.refresh(db_submission)
 
-    # 4. GỬI TÁC VỤ CHO WORKER
-    process_submission.delay(submission_id, public_url, topic_prompt) # <-- Gửi URL cho worker
+    process_submission.delay(submission_id, public_url, topic_prompt)
 
     return {"submission_id": submission_id, "status": "PENDING"}
 

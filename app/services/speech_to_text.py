@@ -19,9 +19,7 @@ def get_model():
 
 
 def transcribe_audio(file_path: str) -> Dict[str, str]:
-    """
-    Transcribes the audio file and returns both the text and detected language.
-    """
+
     print(f"Transcribing audio file: {file_path}")
     model = get_model()
     use_fp16 = DEVICE != "cpu"
