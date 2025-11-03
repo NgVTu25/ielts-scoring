@@ -3,6 +3,7 @@ import json
 import google.generativeai as genai
 from dotenv import load_dotenv
 from .audio_analysis import analyze_fluency, analyze_pronunciation
+import time
 
 load_dotenv()
 
@@ -53,6 +54,14 @@ def safe_float(val, default=5.5):
 def evaluate_speaking(audio_path, transcript, topic_prompt):
     print("Starting evaluation...")
 
+    start = time.time()
+    pronunciation = analyze_pronunciation(audio_path)
+    print(f"[TIME] Pronunciation analysis: {time.time() - start:.2f}s")
+
+    start = time.time()
+    fluency = analyze_fluency(audio_path)
+    print(f"[TIME] Fluency analysis: {time.time() - start:.2f}s")
+
     pronunciation = analyze_pronunciation(audio_path)
     fluency = analyze_fluency(audio_path)
 
@@ -64,7 +73,9 @@ def evaluate_speaking(audio_path, transcript, topic_prompt):
         try:
             prompt = create_gemini_prompt(transcript, topic_prompt)
             print("Sending detailed request to Gemini API...")
+            start = time.time()
             response = GEMINI_MODEL.generate_content(prompt)
+            print(f"[TIME] Gemini API response: {time.time() - start:.2f}s")
 
             response_text = response.text.strip().replace("```json", "").replace("```", "")
             scores_data = json.loads(response_text)
