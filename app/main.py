@@ -12,20 +12,6 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Free AI IELTS Speaking Scoring System")
 
-if os.getenv("USE_NGROK", "false").lower() == "true":
-    try:
-        from .ngrok_setup import start_ngrok
-
-        public_url = start_ngrok(port=8000)
-        if public_url:
-            print(f"🌍 Public API URL: {public_url}")
-    except Exception as e:
-        print(f"⚠️ Failed to start Ngrok: {e}")
-
-# UPLOADS_DIR = "/app/uploads"
-# os.makedirs(UPLOADS_DIR, exist_ok=True)
-
-
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the IELTS Speaking Scoring API"}
