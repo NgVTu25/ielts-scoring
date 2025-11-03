@@ -2,6 +2,7 @@
 import os
 import boto3
 from botocore.client import Config
+import io
 
 B2_BUCKET_NAME = os.getenv("B2_BUCKET_NAME")
 B2_ENDPOINT_URL = os.getenv("B2_ENDPOINT_URL")
@@ -37,15 +38,14 @@ def upload_audio_file(submission_id: str, audio_bytes: bytes, content_type: str)
     bucket.put_object(
         Key=blob_name,
         Body=audio_bytes,
-        ContentType=content_type,
+        ContentType=content_type
     )
 
-    public_url = f"{B2_ENDPOINT_URL}/{B2_BUCKET_NAME}/{blob_name}"
-    return public_url
+    # Trả về key (tên file), không phải URL
+    return blob_name
 
 
 def download_audio_file(blob_name: str) -> bytes:
-    """Tải file bytes từ B2 bằng key (đã xác thực)."""
     s3 = get_b2_resource()
     bucket = s3.Bucket(B2_BUCKET_NAME)
 
