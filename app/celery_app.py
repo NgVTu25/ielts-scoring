@@ -91,6 +91,20 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
         results = evaluate_speaking(audio_file_path, transcript, topic_prompt)
 
         submission.fluency = results["fluency"]
+        submission.fluency = results.get("fluency")
+        submission.pronunciation = results.get("pronunciation")
+        submission.grammar = results.get("grammar")
+        submission.vocabulary = results.get("vocabulary")
+        submission.task_response = results.get("task_response")
+        submission.overall = results.get("overall")
+
+        submission.task_response_feedback = results.get("feedback", {}).get("task_response")
+        submission.grammar_feedback = results.get("feedback", {}).get("grammar")
+        submission.vocabulary_feedback = results.get("feedback", {}).get("vocabulary")
+        submission.overall_feedback = results.get("feedback", {}).get("overall")
+
+        submission.status = SubmissionStatus.COMPLETED
+        db.commit()
         submission.status = SubmissionStatus.COMPLETED
         db.commit()
         print(f"Successfully processed submission {submission_id}")
