@@ -38,7 +38,6 @@ def upload_audio_file(submission_id: str, audio_bytes: bytes, content_type: str)
         Key=blob_name,
         Body=audio_bytes,
         ContentType=content_type,
-        ACL='public-read'
     )
 
     public_url = f"{B2_ENDPOINT_URL}/{B2_BUCKET_NAME}/{blob_name}"
