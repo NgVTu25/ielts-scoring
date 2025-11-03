@@ -9,10 +9,10 @@ import os
 import re
 import tempfile
 from .services.b2_storage import delete_audio_file, download_audio_file
+from . import database
+from .models.submission import Submission
 
-#TEST DB tables
-from . import database, models
-models.Base.metadata.create_all(bind=database.engine)
+database.Base.metadata.create_all(bind=database.engine) # Gọi Base từ database
 
 MIN_ENGLISH_RATIO = 0.5
 REDIS_URL = os.getenv("CELERY_BROKER_URL")
