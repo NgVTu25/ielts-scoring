@@ -44,6 +44,21 @@ def upload_audio_file(submission_id: str, audio_bytes: bytes, content_type: str)
     return public_url
 
 
+def download_audio_file(blob_name: str) -> bytes:
+    """Tải file bytes từ B2 bằng key (đã xác thực)."""
+    s3 = get_b2_resource()
+    bucket = s3.Bucket(B2_BUCKET_NAME)
+
+    # Tạo một đối tượng bytes trong bộ nhớ
+    file_stream = io.BytesIO()
+
+    # Tải file vào đối tượng bytes đó
+    bucket.Object(blob_name).download_fileobj(file_stream)
+
+    # Lấy giá trị bytes
+    file_stream.seek(0)
+    return file_stream.read()
+
 def delete_audio_file(public_url: str):
     s3 = get_b2_resource()
     bucket = s3.Bucket(B2_BUCKET_NAME)

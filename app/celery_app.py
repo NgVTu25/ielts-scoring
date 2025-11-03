@@ -1,4 +1,4 @@
-# File: app/celery_app.py (Đã chuyển sang B2)
+# File: app/celery_app.py (Đã sửa cho B2 - Bucket Private)
 
 from celery import Celery
 from .database import SessionLocal
@@ -7,10 +7,8 @@ from .services.speech_to_text import transcribe_audio
 from .services.scoring import evaluate_speaking
 import os
 import re
-import requests
 import tempfile
-# --- THAY ĐỔI 1: Import từ b2_storage ---
-from .services.b2_storage import delete_audio_file
+from .services.b2_storage import delete_audio_file, download_audio_file
 
 MIN_ENGLISH_RATIO = 0.5
 REDIS_URL = os.getenv("CELERY_BROKER_URL")
@@ -22,7 +20,6 @@ celery_app = Celery(
 )
 
 
-# ... (hàm set_scores_to_zero giữ nguyên) ...
 def set_scores_to_zero(submission, reason: str):
     submission.transcript = reason
     submission.fluency = 0.0
@@ -39,7 +36,7 @@ def set_scores_to_zero(submission, reason: str):
 
 
 @celery_app.task(name="process_submission")
-def process_submission(submission_id: str, public_url: str, topic_prompt: str):
+def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
     db = SessionLocal()
     temp_audio_path = None
     try:
@@ -51,28 +48,23 @@ def process_submission(submission_id: str, public_url: str, topic_prompt: str):
         submission.status = SubmissionStatus.PROCESSING
         db.commit()
 
-        # --- TẢI FILE (Logic này giữ nguyên, vì nó hoạt động với mọi URL) ---
-        print(f"Downloading audio from: {public_url}")
+        print(f"Downloading audio key from B2: {blob_name}")
 
-        response = requests.get(public_url, timeout=30)
-        if response.status_code != 200:
-            raise ValueError(f"Failed to download audio. Status: {response.status_code}")
+        # 1. Dùng hàm download đã xác thực của B2, trả về bytes
+        audio_bytes = download_audio_file(blob_name)
+        if not audio_bytes:
+            raise ValueError("Tải file thất bại (file rỗng).")
 
-        file_extension = os.path.splitext(public_url)[1] or ".wav"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-            tmp_file.write(response.content)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmp_file:
+            tmp_file.write(audio_bytes)
             temp_audio_path = tmp_file.name
 
         audio_file_path = temp_audio_path
-        # -----------------------------------------------------------------
 
-        # BƯỚC 2: Chuyển đổi giọng nói (Giữ nguyên)
         transcription_result = transcribe_audio(audio_file_path)
         transcript = transcription_result["text"]
         language = transcription_result["language"]
 
-        # BƯỚC 3: Kiểm tra sơ bộ (Giữ nguyên)
-        # ... (toàn bộ logic kiểm tra ngôn ngữ, số lượng từ, v.v. giữ nguyên) ...
         if language != "en":
             set_scores_to_zero(submission, f"[Language Detected: {language.upper()}. Only English is scored.]")
             db.commit()
@@ -90,26 +82,11 @@ def process_submission(submission_id: str, public_url: str, topic_prompt: str):
             db.commit()
             return
 
-        # BƯỚC 4: Chấm điểm (Giữ nguyên)
         print(f"Submission {submission_id}: All checks passed. Proceeding to scoring.")
         submission.transcript = transcript
-
         results = evaluate_speaking(audio_file_path, transcript, topic_prompt)
 
-        # BƯỚC 5: Lưu kết quả (Giữ nguyên)
-        # ... (toàn bộ logic lưu điểm và feedback giữ nguyên) ...
         submission.fluency = results["fluency"]
-        submission.pronunciation = results["pronunciation"]
-        submission.grammar = results["grammar"]
-        submission.vocabulary = results["vocabulary"]
-        submission.task_response = results["task_response"]
-        submission.overall = results["overall"]
-
-        submission.grammar_feedback = results["grammar_feedback"]
-        submission.vocabulary_feedback = results["vocabulary_feedback"]
-        submission.task_response_feedback = results["task_response_feedback"]
-        submission.overall_feedback = results["overall_feedback"]
-
         submission.status = SubmissionStatus.COMPLETED
         db.commit()
         print(f"Successfully processed submission {submission_id}")
@@ -121,17 +98,14 @@ def process_submission(submission_id: str, public_url: str, topic_prompt: str):
             submission.transcript = f"[ERROR] An error occurred during processing: {e}"
             db.commit()
     finally:
-        # Dọn dẹp file tạm
         if temp_audio_path and os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
 
-        # Dọn dẹp file B2
-        if public_url:
+        if blob_name:
             try:
-                delete_audio_file(public_url)
+                delete_audio_file(blob_name)
             except Exception as e:
-                # --- THAY ĐỔI 2: Cập nhật thông báo lỗi ---
-                print(f"WARNING: Failed to delete B2 file {public_url}: {e}")
+                print(f"WARNING: Failed to delete B2 file {blob_name}: {e}")
 
         if db.is_active:
             db.close()

@@ -31,15 +31,15 @@ async def submit_speaking_test(
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        public_url = upload_audio_file(submission_id, audio_bytes, audio.content_type)
-        print(f"File uploaded to B2: {public_url}")
+        blob_name = upload_audio_file(submission_id, audio_bytes, audio.content_type)
+        print(f"File uploaded to B2: {blob_name}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to storage: {e}")
 
     db_submission = models.Submission(
         id=submission_id,
         user_id=user_id,
-        audio_path=public_url,
+        audio_path=blob_name,
         status=models.SubmissionStatus.PENDING,
         topic_prompt=topic_prompt
     )
@@ -47,7 +47,7 @@ async def submit_speaking_test(
     db.commit()
     db.refresh(db_submission)
 
-    process_submission.delay(submission_id, public_url, topic_prompt)
+    process_submission.delay(submission_id, blob_name, topic_prompt)
 
     return {"submission_id": submission_id, "status": "PENDING"}
 
