@@ -1,7 +1,6 @@
 # File: ielts-scorer/app/main.py
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
-import os
 from . import database, utils
 from .models import submission as models
 from .celery_app import process_submission
