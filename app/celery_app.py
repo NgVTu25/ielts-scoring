@@ -105,10 +105,10 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
         submission.overall = results.get("overall")
 
         # --- Feedback từ evaluate_speaking ---
-        submission.task_response_feedback = results.get("task_response_feedback")
-        submission.grammar_feedback = results.get("grammar_feedback")
-        submission.vocabulary_feedback = results.get("vocabulary_feedback")
-        submission.overall_feedback = results.get("overall_feedback")
+        submission.task_response_feedback = results.get("feedback", {}).get("task_response")
+        submission.grammar_feedback = results.get("feedback", {}).get("grammar")
+        submission.vocabulary_feedback = results.get("feedback", {}).get("vocabulary")
+        submission.overall_feedback = results.get("feedback", {}).get("overall")
 
         submission.status = SubmissionStatus.COMPLETED
         db.commit()
