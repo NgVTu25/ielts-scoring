@@ -4,6 +4,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from .audio_analysis import analyze_fluency, analyze_pronunciation
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 
@@ -20,6 +21,7 @@ except Exception as e:
 
 
 def create_gemini_prompt(transcript, topic_prompt):
+    # (Hàm này giữ nguyên, không thay đổi)
     return f"""
     You are a professional IELTS examiner providing a detailed evaluation.
 
@@ -43,6 +45,32 @@ def create_gemini_prompt(transcript, topic_prompt):
     ---
     """
 
+# Điều này cần thiết để submit nó vào thread pool
+def get_gemini_scores(transcript, topic_prompt):
+    if not GEMINI_MODEL or not transcript:
+        print("⚠️ Skipping Gemini: Model not configured or no transcript.")
+        return None
+
+    try:
+        prompt = create_gemini_prompt(transcript, topic_prompt)
+        print("Sending request to Gemini... (with timeout)")
+
+        start_gemini = time.time()
+        response = GEMINI_MODEL.generate_content(
+            prompt,
+            generation_config={"timeout": 180}
+        )
+        print(f"[TIME] Gemini API call: {time.time() - start_gemini:.2f}s")
+
+        response_text = response.text.strip().replace("```json", "").replace("```", "")
+        scores_data = json.loads(response_text)
+        print("✅ Gemini scoring completed.")
+        return scores_data
+
+    except Exception as e:
+        print(f"⚠️ Gemini request failed: {e}")
+        return None
+
 
 def safe_float(val, default=5.5):
     try:
@@ -53,56 +81,76 @@ def safe_float(val, default=5.5):
 
 def evaluate_speaking(audio_path, transcript, topic_prompt):
     print("Starting evaluation...")
+    overall_start_time = time.time()  # Thêm log tổng thời gian
 
-    start = time.time()
-    pronunciation = analyze_pronunciation(audio_path)
-    print(f"[TIME] Pronunciation analysis: {time.time() - start:.2f}s")
+    pronunciation = 5.5
+    fluency = 5.5
+    grammar = 5.5
+    vocabulary = 5.5
+    task_response = 5.5
+    grammar_feedback = "N/A"
+    vocabulary_feedback = "N/A"
+    task_response_feedback = "N/A"
+    overall_feedback = "N/A"
 
-    start = time.time()
-    fluency = analyze_fluency(audio_path)
-    print(f"[TIME] Fluency analysis: {time.time() - start:.2f}s")
+    gemini_results = None
 
-    # Default values
-    grammar = vocabulary = task_response = 5.5
-    grammar_feedback = vocabulary_feedback = task_response_feedback = overall_feedback = "N/A"
+    # [TỐI ƯU] 3. Sử dụng ThreadPoolExecutor để chạy 3 tác vụ song song
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        print("Submitting tasks: Pronunciation, Fluency, Gemini...")
 
-    # --- Gemini scoring ---
-    if GEMINI_MODEL and transcript:
+        # Submit 3 tác vụ
+        future_pron = executor.submit(analyze_pronunciation, audio_path)
+        future_fluency = executor.submit(analyze_fluency, audio_path)
+        future_gemini = executor.submit(get_gemini_scores, transcript, topic_prompt)
+
+        # Lấy kết quả (hàm .result() sẽ chờ cho đến khi tác vụ đó hoàn thành)
         try:
-            prompt = create_gemini_prompt(transcript, topic_prompt)
-            print("Sending request to Gemini... (with timeout)")
-
-            response = GEMINI_MODEL.generate_content(
-                prompt,
-                generation_config={"timeout": 120}   # <= 120 seconds hard limit
-            )
-
-            response_text = response.text.strip().replace("```json", "").replace("```", "")
-            scores_data = json.loads(response_text)
-
-            grammar_data = scores_data.get("grammar", {})
-            vocab_data = scores_data.get("vocabulary", {})
-            task_response_data = scores_data.get("task_response", {})
-
-            grammar = safe_float(grammar_data.get("score"))
-            vocabulary = safe_float(vocab_data.get("score"))
-            task_response = safe_float(task_response_data.get("score"))
-
-            grammar_feedback = grammar_data.get("feedback", "N/A")
-            vocabulary_feedback = vocab_data.get("feedback", "N/A")
-            task_response_feedback = task_response_data.get("feedback", "N/A")
-            overall_feedback = scores_data.get("overall_feedback", "N/A")
-
-            print("✅ Gemini scoring completed.")
-
+            # Lấy kết quả phân tích phát âm
+            pronunciation = future_pron.result()
+            print(f"[TIME] Pronunciation analysis finished.")
         except Exception as e:
-            print(f"⚠️ Gemini request failed: {e}")
-            print("→ Using default midpoint scores.\n")
+            print(f"⚠️ Pronunciation analysis failed: {e}")
+            # pronunciation vẫn là 5.5 (mặc định)
+
+        try:
+            # Lấy kết quả phân tích trôi chảy
+            fluency = future_fluency.result()
+            print(f"[TIME] Fluency analysis finished.")
+        except Exception as e:
+            print(f"⚠️ Fluency analysis failed: {e}")
+            # fluency vẫn là 5.5 (mặc định)
+
+        try:
+            # Lấy kết quả từ Gemini
+            gemini_results = future_gemini.result()
+            # Log thời gian đã được chuyển vào hàm get_gemini_scores()
+        except Exception as e:
+            print(f"⚠️ Gemini task submission/result failed: {e}")
+            # gemini_results vẫn là None
+
+    # --- Xử lý kết quả Gemini (nếu thành công) ---
+    if gemini_results:
+        print("Processing Gemini results...")
+        grammar_data = gemini_results.get("grammar", {})
+        vocab_data = gemini_results.get("vocabulary", {})
+        task_response_data = gemini_results.get("task_response", {})
+
+        grammar = safe_float(grammar_data.get("score"))
+        vocabulary = safe_float(vocab_data.get("score"))
+        task_response = safe_float(task_response_data.get("score"))
+
+        grammar_feedback = grammar_data.get("feedback", "N/A")
+        vocabulary_feedback = vocab_data.get("feedback", "N/A")
+        task_response_feedback = task_response_data.get("feedback", "N/A")
+        overall_feedback = gemini_results.get("overall_feedback", "N/A")
+    else:
+        print("→ Using default midpoint scores for Grammar, Vocab, TR.")
 
     # Compute final overall band
     overall = round((pronunciation + fluency + grammar + vocabulary + task_response) / 5, 1)
 
-    print("Evaluation finished.")
+    print(f"\n[TIME] Total evaluation finished in: {time.time() - overall_start_time:.2f}s")
     return {
         "fluency": fluency,
         "pronunciation": pronunciation,
