@@ -4,7 +4,6 @@ FROM python:3.11-slim as builder
 WORKDIR /app
 ENV TZ=Asia/Ho_Chi_Minh
 
-# Cài đặt các gói hệ thống cần thiết
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     build-essential \
@@ -18,7 +17,7 @@ RUN pip install --no-cache-dir --prefix="/install" \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch==2.1.0 torchaudio==2.1.0 torchvision==0.16.0 \
     -r requirements.txt
-# -----------------------------------------------
+
 
 # ===== STAGE 2: Final Image =====
 FROM python:3.11-slim
@@ -33,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 
+# Copy source code + model
 COPY . .
 
 EXPOSE 8000

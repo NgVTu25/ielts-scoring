@@ -23,7 +23,8 @@ celery_app = Celery("worker", broker=REDIS_URL, backend=REDIS_URL)
 
 # --- Preload Whisper model once ---
 print("Preloading Whisper model into memory...")
-WHISPER_MODEL = load_model("tiny")
+MODEL_PATH = "/app/models/faster-whisper-tiny"
+WHISPER_MODEL = WhisperModel(MODEL_PATH, device="cpu", compute_type="int8")
 print("Whisper model loaded successfully.")
 
 
