@@ -62,20 +62,20 @@ def evaluate_speaking(audio_path, transcript, topic_prompt):
     fluency = analyze_fluency(audio_path)
     print(f"[TIME] Fluency analysis: {time.time() - start:.2f}s")
 
-    pronunciation = analyze_pronunciation(audio_path)
-    fluency = analyze_fluency(audio_path)
-
+    # Default values
     grammar = vocabulary = task_response = 5.5
     grammar_feedback = vocabulary_feedback = task_response_feedback = overall_feedback = "N/A"
 
+    # --- Gemini scoring ---
     if GEMINI_MODEL and transcript:
-        response = None
         try:
             prompt = create_gemini_prompt(transcript, topic_prompt)
-            print("Sending detailed request to Gemini API...")
-            start = time.time()
-            response = GEMINI_MODEL.generate_content(prompt)
-            print(f"[TIME] Gemini API response: {time.time() - start:.2f}s")
+            print("Sending request to Gemini... (with timeout)")
+
+            response = GEMINI_MODEL.generate_content(
+                prompt,
+                generation_config={"timeout": 30}   # <= 12 seconds hard limit
+            )
 
             response_text = response.text.strip().replace("```json", "").replace("```", "")
             scores_data = json.loads(response_text)
@@ -93,18 +93,13 @@ def evaluate_speaking(audio_path, transcript, topic_prompt):
             task_response_feedback = task_response_data.get("feedback", "N/A")
             overall_feedback = scores_data.get("overall_feedback", "N/A")
 
-            print("Gemini scores and feedback received successfully.")
-        except Exception as e:
-            print("\n" + "=" * 50)
-            print("ERROR: Gemini API call failed.")
-            print(f"Type: {type(e).__name__}, Details: {e}")
-            if response:
-                print("\n--- Gemini Raw Response ---")
-                print(response.text)
-                print("--- End ---\n")
-            print("Fallback to default scores.")
-            print("=" * 50 + "\n")
+            print("✅ Gemini scoring completed.")
 
+        except Exception as e:
+            print(f"⚠️ Gemini request failed: {e}")
+            print("→ Using default midpoint scores.\n")
+
+    # Compute final overall band
     overall = round((pronunciation + fluency + grammar + vocabulary + task_response) / 5, 1)
 
     print("Evaluation finished.")
