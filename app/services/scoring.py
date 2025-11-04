@@ -74,7 +74,7 @@ def evaluate_speaking(audio_path, transcript, topic_prompt):
 
             response = GEMINI_MODEL.generate_content(
                 prompt,
-                generation_config={"timeout": 30}   # <= 12 seconds hard limit
+                generation_config={"timeout": 120}   # <= 120 seconds hard limit
             )
 
             response_text = response.text.strip().replace("```json", "").replace("```", "")
