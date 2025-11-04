@@ -9,7 +9,6 @@ from . import database
 import os
 import re
 import tempfile
-#from whisper import load_model
 
 # --- Init Database Schema ---
 database.Base.metadata.create_all(bind=database.engine)
@@ -21,15 +20,13 @@ REDIS_URL = os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL")
 # --- Celery App Config ---
 celery_app = Celery("worker", broker=REDIS_URL, backend=REDIS_URL)
 
-# --- Preload Whisper model once ---
-#print("Preloading Whisper model into memory...")
-#MODEL_PATH = "/app/models/faster-whisper-tiny"
-#WHISPER_MODEL = WhisperModel(MODEL_PATH, device="cpu", compute_type="int8")
-#print("Whisper model loaded successfully.")
+celery_app.conf.task_acks_late = True
+celery_app.conf.broker_transport_options = {"visibility_timeout": 1800}
+celery_app.conf.task_reject_on_worker_lost = True
+celery_app.conf.worker_prefetch_multiplier = 1  
 
 
 def set_scores_to_zero(submission, reason: str):
-    """Gán điểm = 0 khi không thể chấm."""
     submission.transcript = reason
     submission.fluency = 0.0
     submission.pronunciation = 0.0
@@ -44,7 +41,12 @@ def set_scores_to_zero(submission, reason: str):
     submission.status = SubmissionStatus.COMPLETED
 
 
-@celery_app.task(name="process_submission")
+@celery_app.task(
+    name="process_submission",
+    autoretry_for=(),   # Tắt auto retry
+    retry=False,        # Không lặp task khi fail
+    acks_late=True,     # Xác nhận sau khi xử lý xong
+)
 def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
     db = SessionLocal()
     temp_audio_path = None
@@ -67,18 +69,15 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
             tmp_file.write(audio_bytes)
             temp_audio_path = tmp_file.name
 
-        # --- Transcribe ---
         transcription_result = transcribe_audio(temp_audio_path)
         transcript = transcription_result["text"]
         language = transcription_result["language"]
 
-        # --- Kiểm tra ngôn ngữ ---
         if language.lower() != "en":
             set_scores_to_zero(submission, f"[Language Detected: {language.upper()}. Only English is scored.]")
             db.commit()
             return
 
-        # --- Kiểm tra nội dung hợp lệ ---
         total_words = len(transcript.split())
         if total_words < 5:
             set_scores_to_zero(submission, "[Insufficient content. Too few words to score.]")
@@ -92,12 +91,10 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
             db.commit()
             return
 
-        # --- Evaluate ---
         print(f"Submission {submission_id}: All checks passed. Proceeding to scoring.")
         submission.transcript = transcript
         results = evaluate_speaking(temp_audio_path, transcript, topic_prompt)
 
-        # --- Mapping kết quả ---
         submission.fluency = results.get("fluency")
         submission.pronunciation = results.get("pronunciation")
         submission.grammar = results.get("grammar")
@@ -105,7 +102,6 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
         submission.task_response = results.get("task_response")
         submission.overall = results.get("overall")
 
-        # --- Feedback từ evaluate_speaking ---
         submission.task_response_feedback = results.get("feedback", {}).get("task_response")
         submission.grammar_feedback = results.get("feedback", {}).get("grammar")
         submission.vocabulary_feedback = results.get("feedback", {}).get("vocabulary")
@@ -124,7 +120,6 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
             db.commit()
 
     finally:
-        # --- Cleanup ---
         if temp_audio_path and os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
 

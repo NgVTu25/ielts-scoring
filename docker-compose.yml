@@ -33,6 +33,6 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-    command: celery -A app.celery_app worker --loglevel=info --pool=solo
+    command: celery -A app.celery_app.celery_app worker --concurrency=2 --loglevel=info --pool=solo
     depends_on:
       - redis
