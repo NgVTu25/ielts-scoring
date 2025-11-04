@@ -58,7 +58,7 @@ def get_gemini_scores(transcript, topic_prompt):
         start_gemini = time.time()
         response = GEMINI_MODEL.generate_content(
             prompt,
-            generation_config={"timeout": 180}
+            request_options={"timeout": 210}
         )
         print(f"[TIME] Gemini API call: {time.time() - start_gemini:.2f}s")
 
