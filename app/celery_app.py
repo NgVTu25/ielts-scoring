@@ -9,23 +9,23 @@ from . import database
 import os
 import re
 import tempfile
-from whisper import load_model
+#from whisper import load_model
 
 # --- Init Database Schema ---
 database.Base.metadata.create_all(bind=database.engine)
 
 # --- Constants ---
 MIN_ENGLISH_RATIO = 0.5
-REDIS_URL = os.getenv("CELERY_BROKER_URL")
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL")
 
 # --- Celery App Config ---
 celery_app = Celery("worker", broker=REDIS_URL, backend=REDIS_URL)
 
 # --- Preload Whisper model once ---
-print("Preloading Whisper model into memory...")
-MODEL_PATH = "/app/models/faster-whisper-tiny"
-WHISPER_MODEL = WhisperModel(MODEL_PATH, device="cpu", compute_type="int8")
-print("Whisper model loaded successfully.")
+#print("Preloading Whisper model into memory...")
+#MODEL_PATH = "/app/models/faster-whisper-tiny"
+#WHISPER_MODEL = WhisperModel(MODEL_PATH, device="cpu", compute_type="int8")
+#print("Whisper model loaded successfully.")
 
 
 def set_scores_to_zero(submission, reason: str):

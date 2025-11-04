@@ -2,8 +2,6 @@
 from faster_whisper import WhisperModel
 from typing import Dict
 import torch
-from app.celery_app import WHISPER_MODEL
-
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_SIZE = "tiny"
@@ -22,7 +20,9 @@ def get_model():
 def transcribe_audio(file_path: str):
     print(f"Transcribing audio: {file_path}")
 
-    segments, info = WHISPER_MODEL.transcribe(file_path, language="en")
+    model = get_model()
+    segments, info = model.transcribe(file_path, language="en")
+
     text = " ".join(seg.text for seg in segments).strip()
 
     print(f"Detected language: {info.language}")
