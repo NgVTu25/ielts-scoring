@@ -1,6 +1,7 @@
 # File: ielts-scorer/app/main.py
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 from . import database, utils
 from .models import submission as models
 from .celery_app import process_submission
@@ -10,6 +11,14 @@ from .services.b2_storage import upload_audio_file
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Free AI IELTS Speaking Scoring System")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
