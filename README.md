@@ -16,7 +16,7 @@ Một hệ thống chấm điểm kỹ năng Nói trong kỳ thi IELTS hoàn ch�
 Hệ thống được xây dựng dựa trên một kiến trúc microservice đơn giản, dễ hiểu.
 
 ```
-Client → FastAPI → Redis → Celery Worker → [Whisper, Librosa] → Gemini API → SQLite
+Client → FastAPI → Redis → Celery Worker → [Whisper, Librosa] → Gemini API → Database
 ```
 
 | Thành phần | Công cụ | Mục đích |
@@ -56,10 +56,25 @@ Hệ thống cần một API key từ Google AI Studio để chấm điểm Ng�
 # File: .env
 # Tuyệt đối không đưa file này lên Git.
 
+# Bắt buộc: API Key của bạn từ Google AI Studio
 GEMINI_API_KEY="YOUR_API_KEY_HERE"
+
+# Bắt buộc: Cấu hình B2 Cloud Storage (hoặc S3-compatible)
+# Dùng để lưu trữ file audio người dùng upload lên
+B2_BUCKET_NAME="your-bucket-name"
+B2_ENDPOINT_URL="https://s3.xxxx.backblazeb2.com"
+B2_KEY_ID="your-key-id"
+B2_APPLICATION_KEY="your-app-key"
+
+# Tùy chọn: Cấu hình Database URL (SQLAlchemy)
+# Mặc định: sử dụng file SQLite tại ./ielts_scorer.db
+# Nếu dùng Postgres (khuyến nghị cho production):
+# DATABASE_URL="postgresql://user:password@host:port/dbname"
+
+# Biến môi trường cho Docker & Celery (thường không cần đổi)
+CELERY_BROKER_URL="redis://redis:6379/0"
 PYTHONUNBUFFERED=1
 ```
-> ⚠️ **Cảnh báo bảo mật:** File `.env` chứa thông tin nhạy cảm. Nó đã được thêm vào file `.gitignore` để tránh bị đưa lên Git một cách vô tình. **Không bao giờ chia sẻ API key của bạn một cách công khai.**
 
 **3. Chạy ứng dụng bằng Docker Compose**
 
@@ -94,7 +109,6 @@ curl -X POST "http://localhost:8000/api/v1/submit" \
 {
   "submission_id": "Abc123Xyz789",
   "status": "PENDING",
-  "topic_prompt":""
 }
 ```
 ```json
@@ -129,17 +143,17 @@ curl -X POST "http://localhost:8000/api/v1/submit" \
 ielts-scorer/
 ├── app/
 │   ├── main.py             # FastAPI server, định nghĩa API endpoints
-│   ├── celery_app.py       # Cấu hình Celery và định nghĩa tác vụ nền
-│   ├── database.py         # Thiết lập cơ sở dữ liệu SQLAlchemy
+│   ├── celery_app.py       # Cấu hình Celery và định nghĩa tác vụ nền (scoring logic)
+│   ├── database.py         # Thiết lập cơ sở dữ liệu (SQLAlchemy)
 │   ├── models/
-│   │   └── submission.py   # Mô hình dữ liệu cho bảng submissions
+│   │   └── submission.py   # Mô hình dữ liệu cho bảng 'submissions'
 │   └── services/
-│       ├── audio_analysis.py # Hàm chấm điểm Fluency & Pronunciation
+│       ├── audio_analysis.py # Hàm chấm điểm Fluency & Pronunciation (Librosa)
 │       ├── scoring.py        # Logic tổng hợp điểm, gọi Gemini API
-│       └── speech_to_text.py # Wrapper cho OpenAI Whisper
-├── uploads/                # Nơi lưu trữ các file audio được tải lên
+│       ├── speech_to_text.py # Wrapper cho faster-whisper
+│       └── b2_storage.py     # Logic xử lý upload/download file với B2/S3
 ├── .env                    # (Bạn tự tạo) Chứa API key và biến môi trường
-├── docker-compose.yml      # Định nghĩa các service cho Docker
+├── docker-compose.yml      # Định nghĩa các service (api, worker, redis)
 ├── Dockerfile              # Công thức để build image cho ứng dụng
 └── requirements.txt        # Danh sách các thư viện Python
 ```
