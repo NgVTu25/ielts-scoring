@@ -9,6 +9,9 @@ from . import database
 import os
 import re
 import tempfile
+import librosa
+
+MIN_DURATION_SECONDS = 45
 
 # --- Init Database Schema ---
 database.Base.metadata.create_all(bind=database.engine)
@@ -68,6 +71,30 @@ def process_submission(submission_id: str, blob_name: str, topic_prompt: str):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             temp_audio_path = tmp_file.name
+
+            try:
+                # Dùng librosa để lấy độ dài file audio một cách hiệu quả
+                duration = librosa.get_duration(path=temp_audio_path)
+                print(f"Audio duration: {duration:.2f} seconds.")
+
+                if duration < MIN_DURATION_SECONDS:
+                    reason = (
+                        f"[Insufficient audio length. "
+                        f"{duration:.2f}s is less than the required {MIN_DURATION_SECONDS}s. "
+                        f"Scoring aborted.]"
+                    )
+                    set_scores_to_zero(submission, reason)
+                    db.commit()
+                    return  # Quan trọng: Kết thúc task ngay tại đây
+
+            except Exception as e:
+                # Nếu không thể đọc file audio (ví dụ file hỏng), báo lỗi và thất bại
+                print(f"ERROR: Could not get audio duration: {e}")
+                submission.status = SubmissionStatus.FAILED
+                submission.transcript = f"[ERROR] Could not process audio file: {e}"
+                db.commit()
+                return  # Kết thúc task
+
 
         transcription_result = transcribe_audio(temp_audio_path)
         transcript = transcription_result["text"]

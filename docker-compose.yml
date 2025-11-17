@@ -19,6 +19,10 @@ services:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
       - USE_NGROK=${USE_NGROK}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_ENDPOINT_URL=${B2_ENDPOINT_URL}
+      - B2_KEY_ID=${B2_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - redis
@@ -33,6 +37,10 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - B2_BUCKET_NAME=${B2_BUCKET_NAME}
+      - B2_ENDPOINT_URL=${B2_ENDPOINT_URL}
+      - B2_KEY_ID=${B2_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
     command: celery -A app.celery_app.celery_app worker --concurrency=2 --loglevel=info --pool=solo
     depends_on:
       - redis
